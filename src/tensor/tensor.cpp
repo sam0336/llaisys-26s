@@ -187,8 +187,81 @@ tensor_t Tensor::permute(const std::vector<size_t> &order) const {
 }
 
 tensor_t Tensor::view(const std::vector<size_t> &shape) const {
-    TO_BE_IMPLEMENTED();
-    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage));
+    const size_t old_numel = this->numel();
+    const size_t new_numel = std::accumulate(
+        shape.begin(), shape.end(), size_t(1), std::multiplies<size_t>());
+    CHECK_ARGUMENT(old_numel == new_numel, "View shape must preserve the number of elements");
+
+    std::vector<ptrdiff_t> new_strides(shape.size());
+
+    if (old_numel == 0) {
+        if (shape == _meta.shape) {
+            new_strides = _meta.strides;
+        } else {
+            ptrdiff_t stride = 1;
+            for (size_t i = shape.size(); i > 0; --i) {
+                new_strides[i - 1] = stride;
+                stride *= static_cast<ptrdiff_t>(shape[i - 1]);
+            }
+        }
+
+        TensorMeta meta{_meta.dtype, shape, std::move(new_strides)};
+        return std::shared_ptr<Tensor>(new Tensor(std::move(meta), _storage, _offset));
+    }
+
+    if (_meta.shape.empty()) {
+        ptrdiff_t stride = 1;
+        for (size_t i = shape.size(); i > 0; --i) {
+            new_strides[i - 1] = stride;
+            stride *= static_cast<ptrdiff_t>(shape[i - 1]);
+        }
+
+        TensorMeta meta{_meta.dtype, shape, std::move(new_strides)};
+        return std::shared_ptr<Tensor>(new Tensor(std::move(meta), _storage, _offset));
+    }
+
+    ptrdiff_t view_dim = static_cast<ptrdiff_t>(shape.size()) - 1;
+    size_t tensor_numel = 1;
+    size_t view_numel = 1;
+    ptrdiff_t chunk_base_stride = _meta.strides.back();
+
+    for (size_t i = _meta.shape.size(); i > 0; --i) {
+        const size_t tensor_dim = i - 1;
+        tensor_numel *= _meta.shape[tensor_dim];
+
+        const bool chunk_ends =
+            tensor_dim == 0
+            || (_meta.shape[tensor_dim - 1] != 1
+                && _meta.strides[tensor_dim - 1]
+                       != static_cast<ptrdiff_t>(tensor_numel) * chunk_base_stride);
+
+        if (!chunk_ends) {
+            continue;
+        }
+
+        while (view_dim >= 0
+               && (view_numel < tensor_numel || shape[static_cast<size_t>(view_dim)] == 1)) {
+            new_strides[static_cast<size_t>(view_dim)] =
+                static_cast<ptrdiff_t>(view_numel) * chunk_base_stride;
+            view_numel *= shape[static_cast<size_t>(view_dim)];
+            --view_dim;
+        }
+
+        CHECK_ARGUMENT(view_numel == tensor_numel,
+                       "View shape is incompatible with the tensor's shape and strides");
+
+        if (tensor_dim > 0) {
+            chunk_base_stride = _meta.strides[tensor_dim - 1];
+            tensor_numel = 1;
+            view_numel = 1;
+        }
+    }
+
+    CHECK_ARGUMENT(view_dim == -1,
+                   "View shape is incompatible with the tensor's shape and strides");
+
+    TensorMeta meta{_meta.dtype, shape, std::move(new_strides)};
+    return std::shared_ptr<Tensor>(new Tensor(std::move(meta), _storage, _offset));
 }
 
 tensor_t Tensor::slice(size_t dim, size_t start, size_t end) const {
