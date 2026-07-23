@@ -182,8 +182,30 @@ bool Tensor::isContiguous() const {
 }
 
 tensor_t Tensor::permute(const std::vector<size_t> &order) const {
-    TO_BE_IMPLEMENTED();
-    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage));
+    // 维度数量校验
+    CHECK_ARGUMENT(order.size() == _meta.shape.size(),
+                   "Permute order must have the same number of dimensions as the tensor");
+    
+    // 越界与重复检查
+    std::vector<bool> seen(order.size(), false); // 用于检查重复维度
+    for (size_t d : order) {
+        CHECK_ARGUMENT(d < _meta.shape.size(),
+                       "Permute order contains an invalid dimension index");
+        CHECK_ARGUMENT(!seen[d],
+                       "Permute order contains a duplicate dimension");
+        seen[d] = true; // 标记该维度已被访问
+    }
+
+    // 重排形状和步长
+    std::vector<size_t> new_shape(order.size());
+    std::vector<ptrdiff_t> new_strides(order.size());
+    for (size_t i = 0; i < order.size(); ++i) {
+        new_shape[i] = _meta.shape[order[i]];
+        new_strides[i] = _meta.strides[order[i]];
+    }
+
+    TensorMeta meta{_meta.dtype, std::move(new_shape), std::move(new_strides)};
+    return std::shared_ptr<Tensor>(new Tensor(std::move(meta), _storage, _offset));
 }
 
 tensor_t Tensor::view(const std::vector<size_t> &shape) const {
