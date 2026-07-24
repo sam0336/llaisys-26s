@@ -287,8 +287,23 @@ tensor_t Tensor::view(const std::vector<size_t> &shape) const {
 }
 
 tensor_t Tensor::slice(size_t dim, size_t start, size_t end) const {
-    TO_BE_IMPLEMENTED();
-    return std::shared_ptr<Tensor>(new Tensor(_meta, _storage));
+    CHECK_ARGUMENT(dim < _meta.shape.size(),
+                   "Slice dim must be less than the number of dimensions");
+    CHECK_ARGUMENT(start < end,
+                   "Slice start must be less than end");
+    CHECK_ARGUMENT(end <= _meta.shape[dim],
+                   "Slice end must be less than or equal to the dimension size");
+
+    // 切片后该维度形状改变
+    std::vector<size_t> new_shape = _meta.shape;
+    new_shape[dim] = end - start;
+
+    // 切片后数据的字节偏移量
+    size_t new_offset = _offset
+                        + start * static_cast<size_t>(_meta.strides[dim]) * elementSize();
+
+    TensorMeta meta{_meta.dtype, std::move(new_shape), _meta.strides};
+    return std::shared_ptr<Tensor>(new Tensor(std::move(meta), _storage, new_offset));
 }
 
 void Tensor::load(const void *src_) {
