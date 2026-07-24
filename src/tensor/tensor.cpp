@@ -169,6 +169,7 @@ bool Tensor::isContiguous() const {
     }
 
     ptrdiff_t expected_stride = 1;
+    
     for (size_t i = this->ndim(); i > 0; --i) {
         const size_t dim = i - 1;
 
