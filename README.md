@@ -5,7 +5,7 @@
 <a href="README_ZN.md" target="README_ZN.md">中文</a>
 </p>
 
-## Introduction
+## Introduction 
 
 LLAISYS (Let's Learn AI SYStem) is an educational project that aims to provide a platform for new and future AI engineers to learn how to build AI systems from scratch. LLAISYS consists of assignments that help students learn and build the basic modules, followed by a project stage in which qualified students contribute to the InfiniLM inference engine. LLAISYS uses C++ as primary programming language for system backend, and is compiled into shared libraries exposing C language APIs. Frontend codes are written in Python which calls these APIs to provide more convenient testing and interaction with other architectures such as PyTorch.
 
