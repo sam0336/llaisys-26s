@@ -6,29 +6,23 @@
 
 template <typename T>
 void rms_norm_(T *out, const T *in, const T *weight, float eps, size_t m, size_t d) {
-    if constexpr (std::is_same_v<T, llaisys::bf16_t> || std::is_same_v<T, llaisys::fp16_t>) {
-        for (size_t i = 0; i < m; i++) {
-            float sum_sq = 0.0f;
-            for (size_t j = 0; j < d; j++) {
+    for (size_t i = 0; i < m; i++) {
+        float sum_sq = 0.0f;
+        for (size_t j = 0; j < d; j++) {
+            if constexpr (std::is_same_v<T, llaisys::bf16_t> || std::is_same_v<T, llaisys::fp16_t>) {
                 float val = llaisys::utils::cast<float>(in[i * d + j]);
                 sum_sq += val * val;
+            } else {
+                sum_sq += in[i * d + j] * in[i * d + j];
             }
-            float rms = std::sqrt(sum_sq / d + eps);
-            for (size_t j = 0; j < d; j++) {
+        }
+        float rms = std::sqrt(sum_sq / d + eps);
+        for (size_t j = 0; j < d; j++) {
+            if constexpr (std::is_same_v<T, llaisys::bf16_t> || std::is_same_v<T, llaisys::fp16_t>) {
                 float val = llaisys::utils::cast<float>(in[i * d + j]);
                 float w = llaisys::utils::cast<float>(weight[j]);
                 out[i * d + j] = llaisys::utils::cast<T>(val * w / rms);
-            }
-        }
-    } else {
-        for (size_t i = 0; i < m; i++) {
-            float sum_sq = 0.0f;
-            for (size_t j = 0; j < d; j++) {
-                float val = in[i * d + j];
-                sum_sq += val * val;
-            }
-            float rms = std::sqrt(sum_sq / d + eps);
-            for (size_t j = 0; j < d; j++) {
+            } else {
                 out[i * d + j] = in[i * d + j] * weight[j] / rms;
             }
         }
