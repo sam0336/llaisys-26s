@@ -1,19 +1,45 @@
 #include "rope_cpu.hpp"
 
 #include <cmath>
+#include <cstring>
+#include <unordered_map>
 #include <vector>
 
 #include "../../../utils.hpp"
+
+namespace {
+uint64_t make_freq_key(float theta, size_t d) {
+    uint32_t theta_bits;
+    std::memcpy(&theta_bits, &theta, sizeof(theta_bits));
+    return (static_cast<uint64_t>(theta_bits) << 32) | static_cast<uint64_t>(d);
+}
+
+const std::vector<float> &get_freq(float theta, size_t d) {
+    static std::unordered_map<uint64_t, std::vector<float>> cache;
+
+    uint64_t key = make_freq_key(theta, d);
+    auto it = cache.find(key);
+    if (it != cache.end()) {
+        return it->second;
+    }
+
+    size_t half_d = d / 2;
+    std::vector<float> freq(half_d);
+    for (size_t j = 0; j < half_d; j++) {
+        freq[j] = std::pow(theta, 2.0f * static_cast<float>(j) / static_cast<float>(d));
+    }
+    auto [new_it, _] = cache.emplace(key, std::move(freq));
+    return new_it->second;
+}
+
+} // anonymous namespace
 
 template <typename T>
 void rope_(T *out, const T *in, const int64_t *pos_ids, float theta,
            size_t seqlen, size_t nheads, size_t d) {
     size_t half_d = d / 2;
 
-    std::vector<float> freq(half_d);
-    for (size_t j = 0; j < half_d; j++) {
-        freq[j] = std::pow(theta, 2.0f * static_cast<float>(j) / static_cast<float>(d));
-    }
+    const auto &freq = get_freq(theta, d);
 
     for (size_t s = 0; s < seqlen; s++) {
         float pos = static_cast<float>(pos_ids[s]);
