@@ -1,57 +1,137 @@
 #include "../runtime_api.hpp"
 
-#include <cstdlib>
-#include <cstring>
+#include <cuda_runtime.h>
+#include <cstdio>
+#include <sstream>
+#include <stdexcept>
 
 namespace llaisys::device::nvidia {
 
-namespace runtime_api {
-int getDeviceCount() {
-    TO_BE_IMPLEMENTED();
+namespace {
+
+/**
+ * @brief Map llaisysMemcpyKind_t to cudaMemcpyKind.
+ *
+ * The two enums intentionally share the same numeric values:
+ *   LLAISYS_MEMCPY_H2H = 0  <->  cudaMemcpyHostToHost   = 0
+ *   LLAISYS_MEMCPY_H2D = 1  <->  cudaMemcpyHostToDevice = 1
+ *   LLAISYS_MEMCPY_D2H = 2  <->  cudaMemcpyDeviceToHost = 2
+ *   LLAISYS_MEMCPY_D2D = 3  <->  cudaMemcpyDeviceToDevice = 3
+ */
+inline cudaMemcpyKind toCudaMemcpyKind(llaisysMemcpyKind_t kind) {
+    return static_cast<cudaMemcpyKind>(kind);
 }
 
-void setDevice(int) {
-    TO_BE_IMPLEMENTED();
+#define CUDA_CHECK(call)                                                                    \
+    do {                                                                                    \
+        cudaError_t _err = (call);                                                          \
+        if (_err != cudaSuccess) {                                                          \
+            std::ostringstream _oss;                                                        \
+            _oss << "[ERROR] CUDA call failed at " << __FILE__ << ":" << __LINE__ << " - " \
+                 << cudaGetErrorName(_err) << ": " << cudaGetErrorString(_err);             \
+            throw std::runtime_error(_oss.str());                                           \
+        }                                                                                   \
+    } while (0)
+
+/**
+ * @brief Run a CUDA call; if the error is benign (destroying nullptr, etc.),
+ *        silently ignore it.  Otherwise throw.
+ */
+inline void cudaCheckBenign(cudaError_t err, const char *file, int line) {
+    if (err == cudaSuccess)
+        return;
+    if (err == cudaErrorInvalidResourceHandle || err == cudaErrorInvalidDevicePointer
+        || err == cudaErrorInvalidValue) {
+#ifndef NDEBUG
+        std::fprintf(stderr, "[WARNING] CUDA benign error at %s:%d - %s: %s\n",
+                     file, line, cudaGetErrorName(err), cudaGetErrorString(err));
+#endif
+        return;
+    }
+    std::ostringstream oss;
+    oss << "[ERROR] CUDA call failed at " << file << ":" << line << " - "
+        << cudaGetErrorName(err) << ": " << cudaGetErrorString(err);
+    throw std::runtime_error(oss.str());
+}
+
+} // anonymous namespace
+
+namespace runtime_api {
+
+// ---- Device ----
+
+int getDeviceCount() {
+    int count = 0;
+    CUDA_CHECK(cudaGetDeviceCount(&count));
+    return count;
+}
+
+void setDevice(int device) {
+    CUDA_CHECK(cudaSetDevice(device));
 }
 
 void deviceSynchronize() {
-    TO_BE_IMPLEMENTED();
+    CUDA_CHECK(cudaDeviceSynchronize());
+    CUDA_CHECK(cudaGetLastError());
 }
 
+// ---- Stream ----
+
 llaisysStream_t createStream() {
-    TO_BE_IMPLEMENTED();
+    cudaStream_t stream = nullptr;
+    CUDA_CHECK(cudaStreamCreate(&stream));
+    return static_cast<llaisysStream_t>(stream);
 }
 
 void destroyStream(llaisysStream_t stream) {
-    TO_BE_IMPLEMENTED();
-}
-void streamSynchronize(llaisysStream_t stream) {
-    TO_BE_IMPLEMENTED();
+    // Destroying the null/default stream or an already-destroyed stream
+    // is not a hard error — silently ignore.
+    cudaError_t err = cudaStreamDestroy(static_cast<cudaStream_t>(stream));
+    cudaCheckBenign(err, __FILE__, __LINE__);
 }
 
+void streamSynchronize(llaisysStream_t stream) {
+    CUDA_CHECK(cudaStreamSynchronize(static_cast<cudaStream_t>(stream)));
+    CUDA_CHECK(cudaGetLastError());
+}
+
+// ---- Memory allocation ----
+
 void *mallocDevice(size_t size) {
-    TO_BE_IMPLEMENTED();
+    void *ptr = nullptr;
+    CUDA_CHECK(cudaMalloc(&ptr, size));
+    return ptr;
 }
 
 void freeDevice(void *ptr) {
-    TO_BE_IMPLEMENTED();
+    cudaError_t err = cudaFree(ptr);
+    cudaCheckBenign(err, __FILE__, __LINE__);
 }
 
 void *mallocHost(size_t size) {
-    TO_BE_IMPLEMENTED();
+    void *ptr = nullptr;
+    CUDA_CHECK(cudaMallocHost(&ptr, size));
+    return ptr;
 }
 
 void freeHost(void *ptr) {
-    TO_BE_IMPLEMENTED();
+    cudaError_t err = cudaFreeHost(ptr);
+    cudaCheckBenign(err, __FILE__, __LINE__);
 }
+
+// ---- Memory copy ----
 
 void memcpySync(void *dst, const void *src, size_t size, llaisysMemcpyKind_t kind) {
-    TO_BE_IMPLEMENTED();
+    CUDA_CHECK(cudaMemcpy(dst, src, size, toCudaMemcpyKind(kind)));
 }
 
-void memcpyAsync(void *dst, const void *src, size_t size, llaisysMemcpyKind_t kind) {
-    TO_BE_IMPLEMENTED();
+void memcpyAsync(void *dst, const void *src, size_t size,
+                 llaisysMemcpyKind_t kind, llaisysStream_t stream) {
+    CUDA_CHECK(cudaMemcpyAsync(dst, src, size, toCudaMemcpyKind(kind),
+                               static_cast<cudaStream_t>(stream)));
 }
+
+// ---- API function table ----
 
 static const LlaisysRuntimeAPI RUNTIME_API = {
     &getDeviceCount,
@@ -65,11 +145,13 @@ static const LlaisysRuntimeAPI RUNTIME_API = {
     &mallocHost,
     &freeHost,
     &memcpySync,
-    &memcpyAsync};
+    &memcpyAsync,
+};
 
 } // namespace runtime_api
 
 const LlaisysRuntimeAPI *getRuntimeAPI() {
     return &runtime_api::RUNTIME_API;
 }
+
 } // namespace llaisys::device::nvidia
