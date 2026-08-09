@@ -1,9 +1,8 @@
 #include "../runtime_api.hpp"
+#include "../../utils/cuda_utils.hpp"
 
 #include <cuda_runtime.h>
 #include <cstdio>
-#include <sstream>
-#include <stdexcept>
 
 namespace llaisys::device::nvidia {
 
@@ -21,17 +20,6 @@ namespace {
 inline cudaMemcpyKind toCudaMemcpyKind(llaisysMemcpyKind_t kind) {
     return static_cast<cudaMemcpyKind>(kind);
 }
-
-#define CUDA_CHECK(call)                                                                    \
-    do {                                                                                    \
-        cudaError_t _err = (call);                                                          \
-        if (_err != cudaSuccess) {                                                          \
-            std::ostringstream _oss;                                                        \
-            _oss << "[ERROR] CUDA call failed at " << __FILE__ << ":" << __LINE__ << " - " \
-                 << cudaGetErrorName(_err) << ": " << cudaGetErrorString(_err);             \
-            throw std::runtime_error(_oss.str());                                           \
-        }                                                                                   \
-    } while (0)
 
 /**
  * @brief Run a CUDA call; if the error is benign (destroying nullptr, etc.),
