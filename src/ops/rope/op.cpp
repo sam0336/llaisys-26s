@@ -4,6 +4,9 @@
 #include "../../utils.hpp"
 
 #include "cpu/rope_cpu.hpp"
+#ifdef ENABLE_NVIDIA_API
+#include "nvidia/rope_nvidia.cuh"
+#endif
 
 namespace llaisys::ops {
 void rope(tensor_t out, tensor_t in, tensor_t pos_ids, float theta) {
@@ -38,8 +41,8 @@ void rope(tensor_t out, tensor_t in, tensor_t pos_ids, float theta) {
                          seqlen, nheads, d);
 #ifdef ENABLE_NVIDIA_API
     case LLAISYS_DEVICE_NVIDIA:
-        TO_BE_IMPLEMENTED();
-        return;
+        return nvidia::rope(out->data(), in->data(), pos_ids->data(), theta, out->dtype(),
+                            seqlen, nheads, d);
 #endif
     default:
         EXCEPTION_UNSUPPORTED_DEVICE;
