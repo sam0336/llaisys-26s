@@ -137,11 +137,11 @@ target("llaisys")
     -- Force whole-archive for NVIDIA static libs so CUDA registration
     -- symbols (__cudaRegisterLinkedBinary_*) are not dropped by the linker.
     if has_config("nv-gpu") and is_plat("linux") then
-        add_links("-Wl,--whole-archive",
-                  "-lllaisys-ops-nvidia",
-                  "-lllaisys-device-nvidia",
-                  "-lllaisys-models-nvidia",
-                  "-Wl,--no-whole-archive")
+        add_ldflags("-Wl,--whole-archive",
+                    "-lllaisys-ops-nvidia",
+                    "-lllaisys-device-nvidia",
+                    "-lllaisys-models-nvidia",
+                    "-Wl,--no-whole-archive")
     end
 
     after_install(function (target)
