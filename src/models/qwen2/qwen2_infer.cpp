@@ -1,17 +1,17 @@
 #include "qwen2_infer.hpp"
 
-#include "../../../llaisys/llaisys_tensor.hpp"
+#include "../../llaisys/llaisys_tensor.hpp"
 
-#include "../../../ops/add/op.hpp"
-#include "../../../ops/argmax/op.hpp"
-#include "../../../ops/embedding/op.hpp"
-#include "../../../ops/linear/op.hpp"
-#include "../../../ops/rms_norm/op.hpp"
-#include "../../../ops/rope/op.hpp"
-#include "../../../ops/self_attention/op.hpp"
-#include "../../../ops/swiglu/op.hpp"
-#include "../../../core/llaisys_core.hpp"
-#include "../../../utils.hpp"
+#include "../../ops/add/op.hpp"
+#include "../../ops/argmax/op.hpp"
+#include "../../ops/embedding/op.hpp"
+#include "../../ops/linear/op.hpp"
+#include "../../ops/rms_norm/op.hpp"
+#include "../../ops/rope/op.hpp"
+#include "../../ops/self_attention/op.hpp"
+#include "../../ops/swiglu/op.hpp"
+#include "../../core/llaisys_core.hpp"
+#include "../../utils.hpp"
 
 #include <cmath>
 #include <cstring>
