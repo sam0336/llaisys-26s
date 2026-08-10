@@ -134,14 +134,15 @@ target("llaisys")
     add_files("src/llaisys/*.cc")
     set_installdir(".")
 
-    -- Force whole-archive for NVIDIA static libs so CUDA registration
-    -- symbols (__cudaRegisterLinkedBinary_*) are not dropped by the linker.
-    if has_config("nv-gpu") and is_plat("linux") then
-        add_ldflags("-Wl,--whole-archive",
-                    "-lllaisys-ops-nvidia",
-                    "-lllaisys-device-nvidia",
-                    "-lllaisys-models-nvidia",
-                    "-Wl,--no-whole-archive")
+    -- Compile CUDA source files directly into the shared library to avoid
+    -- static-library symbol-dropping issues with __cudaRegisterLinkedBinary_*.
+    if has_config("nv-gpu") then
+        add_rules("cuda")
+        add_files("src/device/nvidia/*.cu")
+        add_files("src/ops/*/nvidia/*.cu")
+        if is_plat("linux") then
+            add_cuflags("-Xcompiler=-fPIC")
+        end
     end
 
     after_install(function (target)

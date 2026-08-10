@@ -13,48 +13,26 @@ if not has_config("cugencodes") then
     )
 end
 
--- NVIDIA device target: CUDA Runtime API wrapper + device resources.
+-- CUDA source files are now compiled directly into the shared library
+-- (llaisys target) to avoid static-library symbol-dropping issues.
+-- These targets remain as empty placeholders to satisfy the dep chain.
+
 target("llaisys-device-nvidia")
     set_kind("static")
-    add_rules("cuda")
     set_languages("cxx17")
-    set_warnings("all", "error")
-    if not is_plat("windows") then
-        add_cxflags("-fPIC", "-Wno-unknown-pragmas")
-        add_cuflags("-Xcompiler=-fPIC")
-    end
-    add_includedirs("../include")
-    add_files("../src/device/nvidia/*.cu")
     on_install(function (target) end)
 target_end()
 
--- NVIDIA ops target: per-operator CUDA kernels.
 target("llaisys-ops-nvidia")
     set_kind("static")
     add_deps("llaisys-tensor")
-    add_rules("cuda")
     set_languages("cxx17")
-    set_warnings("all", "error")
-    if not is_plat("windows") then
-        add_cxflags("-fPIC", "-Wno-unknown-pragmas")
-        add_cuflags("-Xcompiler=-fPIC")
-    end
-    add_includedirs("../include")
-    add_files("../src/ops/*/nvidia/*.cu")
     on_install(function (target) end)
 target_end()
 
--- NVIDIA models target: model inference on GPU.
 target("llaisys-models-nvidia")
     set_kind("static")
     add_deps("llaisys-ops")
-    add_rules("cuda")
     set_languages("cxx17")
-    set_warnings("all", "error")
-    if not is_plat("windows") then
-        add_cxflags("-fPIC", "-Wno-unknown-pragmas")
-        add_cuflags("-Xcompiler=-fPIC")
-    end
-
     on_install(function (target) end)
 target_end()
