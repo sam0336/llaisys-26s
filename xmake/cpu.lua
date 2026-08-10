@@ -34,7 +34,6 @@ target("llaisys-models-cpu")
         add_cxflags("-fPIC", "-Wno-unknown-pragmas")
     end
 
-    add_files("../src/models/qwen2/cpu/*.cpp")
 
     on_install(function (target) end)
 target_end()
