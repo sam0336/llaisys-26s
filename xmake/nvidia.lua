@@ -21,6 +21,7 @@ target("llaisys-device-nvidia")
     set_warnings("all", "error")
     if not is_plat("windows") then
         add_cxflags("-fPIC", "-Wno-unknown-pragmas")
+        add_cuflags("-Xcompiler=-fPIC")
     end
     add_includedirs("../include")
     add_files("../src/device/nvidia/*.cu")
@@ -36,6 +37,7 @@ target("llaisys-ops-nvidia")
     set_warnings("all", "error")
     if not is_plat("windows") then
         add_cxflags("-fPIC", "-Wno-unknown-pragmas")
+        add_cuflags("-Xcompiler=-fPIC")
     end
     add_includedirs("../include")
     add_files("../src/ops/*/nvidia/*.cu")
@@ -51,8 +53,8 @@ target("llaisys-models-nvidia")
     set_warnings("all", "error")
     if not is_plat("windows") then
         add_cxflags("-fPIC", "-Wno-unknown-pragmas")
+        add_cuflags("-Xcompiler=-fPIC")
     end
-    add_includedirs("../include")
-    add_files("../src/models/qwen2/nvidia/*.cu")
+
     on_install(function (target) end)
 target_end()
