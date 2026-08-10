@@ -9,9 +9,7 @@
 
 namespace llaisys::models {
 class Qwen2Model;
-namespace cpu {
 int64_t qwen2_infer(Qwen2Model *model, const int64_t *token_ids, size_t ntoken);
-} // namespace cpu
 
 
 
@@ -72,8 +70,8 @@ private:
     // Verify that model weights have been loaded before inference
     void _validate_weights() const;
 
-    // Allow CPU implementation to access internal members
-    friend int64_t cpu::qwen2_infer(Qwen2Model *model, const int64_t *token_ids, size_t ntoken);
+    // Allow the infer implementation to access internal members
+    friend int64_t qwen2_infer(Qwen2Model *model, const int64_t *token_ids, size_t ntoken);
 
 public:
     Qwen2Model(const LlaisysQwen2Meta *meta,

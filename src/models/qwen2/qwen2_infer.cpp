@@ -1,4 +1,4 @@
-#include "qwen2_cpu.hpp"
+#include "qwen2_infer.hpp"
 
 #include "../../../llaisys/llaisys_tensor.hpp"
 
@@ -10,12 +10,13 @@
 #include "../../../ops/rope/op.hpp"
 #include "../../../ops/self_attention/op.hpp"
 #include "../../../ops/swiglu/op.hpp"
+#include "../../../core/llaisys_core.hpp"
 #include "../../../utils.hpp"
 
 #include <cmath>
 #include <cstring>
 
-namespace llaisys::models::cpu {
+namespace llaisys::models {
 
 namespace {
 /**
@@ -130,10 +131,18 @@ int64_t qwen2_infer(Qwen2Model *model, const int64_t *token_ids, size_t ntoken) 
                 auto k_slice = model->_k_cache[l]->slice(0, pos, pos + 1);
                 auto v_slice = model->_v_cache[l]->slice(0, pos, pos + 1);
 
-                std::memcpy(k_slice->data(),
-                            model->_k_rope->data(), nbytes_k);
-                std::memcpy(v_slice->data(),
-                            model->_v->data(),      nbytes_v);
+                if (model->_device == LLAISYS_DEVICE_CPU) {
+                    std::memcpy(k_slice->data(),
+                                model->_k_rope->data(), nbytes_k);
+                    std::memcpy(v_slice->data(),
+                                model->_v->data(),      nbytes_v);
+                } else {
+                    auto *api = llaisys::core::context().runtime().api();
+                    api->memcpy_sync(k_slice->data(), model->_k_rope->data(),
+                                     nbytes_k, LLAISYS_MEMCPY_D2D);
+                    api->memcpy_sync(v_slice->data(), model->_v->data(),
+                                     nbytes_v, LLAISYS_MEMCPY_D2D);
+                }
             }
 
             // ----------------------------------------------------------
@@ -230,7 +239,13 @@ int64_t qwen2_infer(Qwen2Model *model, const int64_t *token_ids, size_t ntoken) 
         ops::argmax(model->_max_idx, model->_max_val, model->_logits_1d);
 
         // Read the predicted next-token id back from device memory.
-        std::memcpy(&next_token, model->_max_idx->data(), sizeof(int64_t));
+        if (model->_device == LLAISYS_DEVICE_CPU) {
+            std::memcpy(&next_token, model->_max_idx->data(), sizeof(int64_t));
+        } else {
+            auto *api = llaisys::core::context().runtime().api();
+            api->memcpy_sync(&next_token, model->_max_idx->data(),
+                             sizeof(int64_t), LLAISYS_MEMCPY_D2H);
+        }
 
     } // end token loop
 
@@ -240,4 +255,4 @@ int64_t qwen2_infer(Qwen2Model *model, const int64_t *token_ids, size_t ntoken) 
     return next_token;
 }
 
-} // namespace llaisys::models::cpu
+} // namespace llaisys::models

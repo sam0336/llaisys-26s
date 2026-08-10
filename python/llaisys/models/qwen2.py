@@ -102,6 +102,7 @@ class Qwen2:
 
     def __init__(self, model_path, device: DeviceType = DeviceType.CPU):
         model_path = Path(model_path)
+        self._device = device
 
         # ----------------------------------------------------------
         # 1. Read config.json & create the C++ model
@@ -220,9 +221,9 @@ class Qwen2:
     def _create_weight_tensor(
         self, shape: list, dtype_str: str, raw: bytes
     ) -> Tensor:
-        """Create a CPU Tensor and copy *raw* bytes into it."""
+        """Create a Tensor on the model's device and copy *raw* bytes into it."""
         dt = _SAFETENSORS_DTYPE_MAP[dtype_str]
-        t = Tensor(tuple(shape), dtype=dt, device=DeviceType.CPU, device_id=0)
+        t = Tensor(tuple(shape), dtype=dt, device=self._device, device_id=0)
         buf = (c_ubyte * len(raw)).from_buffer_copy(raw)
         t.load(cast(buf, c_void_p))
         return t

@@ -3,7 +3,7 @@
 #include "../../core/llaisys_core.hpp"
 #include "../../utils.hpp"
 
-#include "cpu/qwen2_cpu.hpp"
+#include "qwen2_infer.hpp"
 
 namespace llaisys::models {
 
@@ -134,11 +134,10 @@ int64_t Qwen2Model::infer(const int64_t *token_ids, size_t ntoken) {
 
     switch (_device) {
     case LLAISYS_DEVICE_CPU:
-        return cpu::qwen2_infer(this, token_ids, ntoken);
+        return qwen2_infer(this, token_ids, ntoken);
 #ifdef ENABLE_NVIDIA_API
     case LLAISYS_DEVICE_NVIDIA:
-        TO_BE_IMPLEMENTED();
-        return 0;
+        return qwen2_infer(this, token_ids, ntoken);
 #endif
     default:
         EXCEPTION_UNSUPPORTED_DEVICE;
