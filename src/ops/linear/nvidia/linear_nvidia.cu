@@ -64,19 +64,19 @@ __global__ void add_bias_kernel(T *out, const T *bias, size_t m, size_t n) {
 template <typename T>
 __global__ void linear_kernel(T *out, const T *in, const T *weight,
                                const T *bias, size_t m, size_t n, size_t k) {
-    for (size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-         i < m;
-         i += blockDim.x * gridDim.x) {
-        T       *dst = out + i * n;
-        const T *src = in  + i * k;
-        for (size_t j = 0; j < n; ++j) {
-            float sum = (bias ? static_cast<float>(bias[j]) : 0.0f);
-            for (size_t kk = 0; kk < k; ++kk) {
-                sum += static_cast<float>(src[kk])
-                     * static_cast<float>(weight[j * k + kk]);
-            }
-            dst[j] = static_cast<T>(sum);
+    size_t total = m * n;
+    for (size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+         idx < total;
+         idx += blockDim.x * gridDim.x) {
+        size_t i = idx / n;
+        size_t j = idx % n;
+        const T *src = in + i * k;
+        float sum = (bias ? static_cast<float>(bias[j]) : 0.0f);
+        for (size_t kk = 0; kk < k; ++kk) {
+            sum += static_cast<float>(src[kk])
+                 * static_cast<float>(weight[j * k + kk]);
         }
+        out[idx] = static_cast<T>(sum);
     }
 }
 
@@ -144,9 +144,40 @@ void linear(std::byte *out, const std::byte *in,
         break;
     }
 
-    // ---- BF16: naive kernel (cuBLAS BF16 support is Ampere+) --------------
+    // ---- BF16: cuBLAS on Ampere+ (SM 80), fallback to naive kernel --------
     case LLAISYS_DTYPE_BF16:
 #if __CUDACC_VER_MAJOR__ >= 11
+    {
+        // Try cuBLAS first (available on SM 80+ / Ampere+).
+        int device;
+        cudaGetDevice(&device);
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, device);
+        if (prop.major >= 8) {
+            const float alpha = 1.0f, beta = 0.0f;
+            cublasHandle_t handle = get_cublas_handle();
+            // cuBLAS might not support BF16 on all Ampere+ GPUs;
+            // fall back to naive kernel if it fails.
+            cublasStatus_t stat = cublasGemmEx(handle,
+                CUBLAS_OP_T, CUBLAS_OP_N,
+                static_cast<int>(n), static_cast<int>(m), static_cast<int>(k),
+                &alpha,
+                reinterpret_cast<const void *>(weight), CUDA_R_16BF, static_cast<int>(k),
+                reinterpret_cast<const void *>(in),     CUDA_R_16BF, static_cast<int>(k),
+                &beta,
+                reinterpret_cast<void *>(out),          CUDA_R_16BF, static_cast<int>(n),
+                CUDA_R_32F, CUBLAS_GEMM_DEFAULT);
+            if (stat == CUBLAS_STATUS_SUCCESS) {
+                if (bias) {
+                    add_bias_kernel<__nv_bfloat16><<<GRID, BLOCK>>>(
+                        reinterpret_cast<__nv_bfloat16 *>(out),
+                        reinterpret_cast<const __nv_bfloat16 *>(bias),
+                        m, n);
+                }
+                break;
+            }
+            // Fall through to naive kernel on cuBLAS failure.
+        }
         linear_kernel<__nv_bfloat16><<<GRID, BLOCK>>>(
             reinterpret_cast<__nv_bfloat16 *>(out),
             reinterpret_cast<const __nv_bfloat16 *>(in),
@@ -154,6 +185,7 @@ void linear(std::byte *out, const std::byte *in,
             reinterpret_cast<const __nv_bfloat16 *>(bias),
             m, n, k);
         break;
+    }
 #else
         EXCEPTION_UNSUPPORTED_DATATYPE(dtype);
         break;
