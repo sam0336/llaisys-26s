@@ -143,6 +143,7 @@ target("llaisys")
         if is_plat("linux") then
             add_cuflags("-Xcompiler=-fPIC")
         end
+        add_links("cublas", "cudart")
     end
 
     after_install(function (target)
