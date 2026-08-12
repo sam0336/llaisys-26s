@@ -139,6 +139,10 @@ int64_t Qwen2Model::infer(const int64_t *token_ids, size_t ntoken) {
     case LLAISYS_DEVICE_NVIDIA:
         return qwen2_infer(this, token_ids, ntoken);
 #endif
+#ifdef ENABLE_MUSA_API
+    case LLAISYS_DEVICE_MUSA:
+        return qwen2_infer(this, token_ids, ntoken);
+#endif
     default:
         EXCEPTION_UNSUPPORTED_DEVICE;
     }
