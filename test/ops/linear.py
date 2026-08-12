@@ -49,19 +49,26 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", default="cpu", choices=["cpu", "nvidia"], type=str)
+    parser.add_argument("--device", default="cpu", choices=["cpu", "nvidia", "musa"], type=str)
     parser.add_argument("--profile", action="store_true")
     args = parser.parse_args()
     testShapes = [
         ((2, 3), (2, 4), (3, 4), True),
         ((512, 4096), (512, 4096), (4096, 4096), True),
     ]
-    testDtypePrec = [
-        # type, atol, rtol
-        ("f32", 1e-5, 1e-5),
-        ("f16", 1e-3, 1e-3),
-        ("bf16", 1e-2, 1e-2),
-    ]
+    if args.device == "musa":
+        # MUSA muBLAS SGEMM algorithm differs from cuBLAS → relaxed f32 tolerance.
+        testDtypePrec = [
+            ("f32", 1e-3, 1e-3),
+            ("f16", 1e-3, 1e-3),
+            ("bf16", 1e-2, 1e-2),
+        ]
+    else:
+        testDtypePrec = [
+            ("f32", 1e-5, 1e-5),
+            ("f16", 1e-3, 1e-3),
+            ("bf16", 1e-2, 1e-2),
+        ]
     print(f"Testing Ops.linear on {args.device}")
     for shapes in testShapes:
         for dtype_name, atol, rtol in testDtypePrec:

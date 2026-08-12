@@ -65,7 +65,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", default="cpu", choices=["cpu", "nvidia"], type=str)
+    parser.add_argument("--device", default="cpu", choices=["cpu", "nvidia", "musa"], type=str)
     parser.add_argument("--profile", action="store_true")
     args = parser.parse_args()
     testShapes = [
@@ -73,12 +73,19 @@ if __name__ == "__main__":
         (2, 2, 1, 1, 4),
         (5, 11, 4, 2, 8),
     ]
-    testDtypePrec = [
-        # type, atol, rtol
-        ("f32", 1e-5, 1e-5),
-        ("f16", 1e-3, 1e-3),
-        ("bf16", 1e-2, 1e-2),
-    ]
+    if args.device == "musa":
+        # MUSA expf implementation differs from CUDA → relaxed f32 tolerance.
+        testDtypePrec = [
+            ("f32", 1e-3, 1e-3),
+            ("f16", 1e-3, 1e-3),
+            ("bf16", 1e-2, 1e-2),
+        ]
+    else:
+        testDtypePrec = [
+            ("f32", 1e-5, 1e-5),
+            ("f16", 1e-3, 1e-3),
+            ("bf16", 1e-2, 1e-2),
+        ]
     print(f"Testing Ops.self_attention on {args.device}")
     for shape in testShapes:
         for dtype_name, atol, rtol in testDtypePrec:
