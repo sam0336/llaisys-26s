@@ -18,6 +18,18 @@ if has_config("nv-gpu") then
     includes("xmake/nvidia.lua")
 end
 
+-- MUSA (Moore Threads) --
+option("musa-gpu")
+    set_default(false)
+    set_showmenu(true)
+    set_description("Whether to compile implementations for Moore Threads MUSA GPU")
+option_end()
+
+if has_config("musa-gpu") then
+    add_defines("ENABLE_MUSA_API")
+    includes("xmake/musa.lua")
+end
+
 target("llaisys-utils")
     set_kind("static")
 
@@ -39,6 +51,9 @@ target("llaisys-device")
     add_deps("llaisys-device-cpu")
     if has_config("nv-gpu") then
         add_deps("llaisys-device-nvidia")
+    end
+    if has_config("musa-gpu") then
+        add_deps("llaisys-device-musa")
     end
 
     set_languages("cxx17")
@@ -89,6 +104,9 @@ target("llaisys-ops")
     if has_config("nv-gpu") then
         add_deps("llaisys-ops-nvidia")
     end
+    if has_config("musa-gpu") then
+        add_deps("llaisys-ops-musa")
+    end
 
     set_languages("cxx17")
     set_warnings("all", "error")
@@ -107,6 +125,9 @@ target("llaisys-models")
     add_deps("llaisys-models-cpu")
     if has_config("nv-gpu") then
         add_deps("llaisys-models-nvidia")
+    end
+    if has_config("musa-gpu") then
+        add_deps("llaisys-models-musa")
     end
 
     set_languages("cxx17")
@@ -130,7 +151,10 @@ target("llaisys")
     add_deps("llaisys-models")
 
     set_languages("cxx17")
-    set_warnings("all", "error")
+    -- nvcc warning flags are incompatible with mcc; suppress for MUSA.
+    if not has_config("musa-gpu") then
+        set_warnings("all", "error")
+    end
     add_files("src/llaisys/*.cc")
     set_installdir(".")
 
@@ -144,6 +168,21 @@ target("llaisys")
             add_cuflags("-Xcompiler=-fPIC")
         end
         add_links("cublas", "cudart")
+    end
+
+    -- Compile MUSA source files (.cu) directly into the shared library.
+    -- Uses xmake's "cuda" rule with MUSA's mcc compiler.
+    -- mcc requires -mtgpu to use the MUSA/MTGPU backend instead of CUDA.
+    if has_config("musa-gpu") then
+        add_rules("cuda")
+        add_files("src/device/musa/*.cu")
+        add_files("src/ops/*/musa/*.cu")
+        if is_plat("linux") then
+            add_cuflags("-mtgpu", {force = true})
+            add_cuflags("-Xcompiler=-fPIC", {force = true})
+            add_cuflags("-w", {force = true})
+        end
+        add_links("mublas", "musart")
     end
 
     after_install(function (target)
